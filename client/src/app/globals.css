@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+    --font-sans: var(--font-inter);
+    --font-mono: var(--font-jetbrains-mono);
+}
+
+@theme inline {
+    --font-sans: var(--font-inter);
+    --font-mono: var(--font-jetbrains-mono);
+}
+
+body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+}
+
+/* Custom utility classes based on design schema */
+@layer utilities {
+    .card-base {
+        @apply bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm;
+    }
+    
+    .text-label {
+        @apply text-xs font-medium text-slate-400 uppercase tracking-wider;
+    }
+    
+    .value-mono {
+        @apply font-mono text-2xl font-medium tracking-tight;
+    }
+}

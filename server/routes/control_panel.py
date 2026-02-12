@@ -1,0 +1,462 @@
+from fastapi import APIRouter
+from fastapi.responses import HTMLResponse
+
+router = APIRouter()
+
+HTML_CONTENT = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridSense - Load Testing Controls</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #020617;
+            color: #f1f5f9;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #3b82f6;
+        }
+        
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+        
+        .section {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .icon {
+            font-size: 1.5rem;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-secondary {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+        }
+        
+        .btn-secondary:hover {
+            background: #334155;
+        }
+        
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #1e293b;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .info {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: #1e293b;
+            border-radius: 6px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .badge-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .dashboard-link {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .dashboard-link:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ GridSense Load Testing</h1>
+        <p class="subtitle">Trigger high load conditions to test critical mode</p>
+        
+        <div style="margin-bottom: 1rem;">
+            <a href="http://localhost:3000" target="_blank" class="dashboard-link">
+                📊 Open Dashboard →
+            </a>
+        </div>
+
+        <!-- Critical Load Triggers -->
+        <div class="section">
+            <h2>
+                <span class="icon">🔴</span>
+                Critical Load (>100A)
+                <span class="badge badge-danger">DANGER</span>
+            </h2>
+            <div class="info">
+                <strong>Motor Fault:</strong> Injects locked rotor fault → 110A sustained current<br>
+                <strong>All Devices On:</strong> ~110A total (motor + HVAC + compressor + lighting)
+            </div>
+            <div class="btn-group">
+                <button class="btn-danger" onclick="injectMotorFault()">
+                    🚨 Inject Motor Fault (110A)
+                </button>
+                <button class="btn-danger" onclick="turnOnAllDevices()">
+                    ⚡ Turn On All Devices (~110A)
+                </button>
+            </div>
+        </div>
+        
+        <!-- Warning Load Triggers -->
+        <div class="section">
+            <h2>
+                <span class="icon">🟡</span>
+                Warning Load (80-100A)
+                <span class="badge badge-warning">WARNING</span>
+            </h2>
+            <div class="info">
+                <strong>Motor Inrush:</strong> Start motor → 120A peak for 0.5s, then decay<br>
+                <strong>High Load:</strong> Motor + Compressor + HVAC running
+            </div>
+            <div class="btn-group">
+                <button class="btn-warning" onclick="startMotor()">
+                    🔄 Start Motor (120A peak)
+                </button>
+                <button class="btn-warning" onclick="turnOnHighLoad()">
+                    ⚡ High Load Mode (~90A)
+                </button>
+            </div>
+        </div>
+        
+        <!-- Individual Device Controls -->
+        <div class="section">
+            <h2>
+                <span class="icon">🎛️</span>
+                Individual Device Controls
+            </h2>
+            <div class="grid">
+                <div>
+                    <strong>Motor (40-45A)</strong>
+                    <div class="btn-group" style="flex-direction: column;">
+                        <button class="btn-primary" onclick="controlDevice('motor_001', 'start')">
+                            ▶️ Start
+                        </button>
+                        <button class="btn-secondary" onclick="controlDevice('motor_001', 'off')">
+                            ⏸️ Stop
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <strong>HVAC (5-20A)</strong>
+                    <div class="btn-group" style="flex-direction: column;">
+                        <button class="btn-primary" onclick="controlDevice('hvac_001', 'on')">
+                            ▶️ On
+                        </button>
+                        <button class="btn-secondary" onclick="controlDevice('hvac_001', 'off')">
+                            ⏸️ Off
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <strong>Compressor (25-30A)</strong>
+                    <div class="btn-group" style="flex-direction: column;">
+                        <button class="btn-primary" onclick="controlDevice('compressor_001', 'on')">
+                            ▶️ On
+                        </button>
+                        <button class="btn-secondary" onclick="controlDevice('compressor_001', 'off')">
+                            ⏸️ Off
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <strong>Lighting (2.5A)</strong>
+                    <div class="btn-group" style="flex-direction: column;">
+                        <button class="btn-primary" onclick="controlDevice('lighting_001', 'on')">
+                            ▶️ On
+                        </button>
+                        <button class="btn-secondary" onclick="controlDevice('lighting_001', 'off')">
+                            ⏸️ Off
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reset -->
+        <div class="section">
+            <h2>
+                <span class="icon">🔄</span>
+                Reset to Normal
+                <span class="badge badge-success">SAFE</span>
+            </h2>
+            <button class="btn-success" onclick="resetToNormal()">
+                ✅ Turn Off All Devices
+            </button>
+        </div>
+        
+        <!-- Status Log -->
+        <div class="section">
+            <h2><span class="icon">📊</span> Status Log</h2>
+            <div id="status" class="status">Ready to test...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        
+        function log(message, type = 'info') {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = {
+                'info': '#94a3b8',
+                'success': '#10b981',
+                'error': '#ef4444',
+                'warning': '#f59e0b'
+            }[type] || '#94a3b8';
+            
+            status.innerHTML = `<div style="color: ${color}">[${timestamp}] ${message}</div>` + status.innerHTML;
+        }
+        
+        async function apiCall(url, method = 'POST') {
+            try {
+                const response = await fetch(`${API_BASE}${url}`, { method });
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                throw new Error(error.message);
+            }
+        }
+        
+        async function injectMotorFault() {
+            log('🔴 Injecting motor fault (locked rotor)...', 'error');
+            try {
+                const result = await apiCall('/api/devices/motor_001/control/inject-fault');
+                log(`✅ ${result.message} - Sustained 110A!`, 'error');
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function startMotor() {
+            log('🔄 Starting motor (inrush current)...', 'warning');
+            try {
+                const result = await apiCall('/api/devices/motor_001/control/start');
+                log(`✅ ${result.message}`, 'warning');
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function turnOnAllDevices() {
+            log('⚡ Turning on ALL devices...', 'error');
+            const devices = ['motor_001', 'hvac_001', 'compressor_001', 'lighting_001'];
+            
+            for (const device of devices) {
+                try {
+                    const action = device === 'motor_001' ? 'start' : 'on';
+                    await apiCall(`/api/devices/${device}/control/${action}`);
+                    log(`  ✓ ${device} turned on`, 'info');
+                } catch (error) {
+                    log(`  ✗ ${device} failed: ${error.message}`, 'error');
+                }
+            }
+            
+            log('🔥 All devices active! Total ~110A', 'error');
+        }
+        
+        async function turnOnHighLoad() {
+            log('⚡ Activating high load mode...', 'warning');
+            const devices = ['motor_001', 'hvac_001', 'compressor_001'];
+            
+            for (const device of devices) {
+                try {
+                    const action = device === 'motor_001' ? 'start' : 'on';
+                    await apiCall(`/api/devices/${device}/control/${action}`);
+                    log(`  ✓ ${device} turned on`, 'info');
+                } catch (error) {
+                    log(`  ✗ ${device} failed: ${error.message}`, 'error');
+                }
+            }
+            
+            log('⚡ High load active! Total ~90A', 'warning');
+        }
+        
+        async function controlDevice(deviceId, action) {
+            log(`Controlling ${deviceId}: ${action}...`, 'info');
+            try {
+                const result = await apiCall(`/api/devices/${deviceId}/control/${action}`);
+                log(`✅ ${result.message}`, 'success');
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function resetToNormal() {
+            log('🔄 Resetting to normal (turning off all devices)...', 'success');
+            const devices = ['motor_001', 'hvac_001', 'compressor_001', 'lighting_001'];
+            
+            for (const device of devices) {
+                try {
+                    await apiCall(`/api/devices/${device}/control/off`);
+                    log(`  ✓ ${device} turned off`, 'info');
+                } catch (error) {
+                    log(`  ✗ ${device} failed: ${error.message}`, 'error');
+                }
+            }
+            
+            log('✅ All devices off. System normal.', 'success');
+        }
+        
+        // Auto-refresh status every 2 seconds
+        setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/live`);
+                const data = await response.json();
+                const totalCurrent = Object.values(data).reduce((sum, d) => sum + d.current, 0);
+                
+                const statusBar = document.querySelector('.subtitle');
+                if (totalCurrent > 100) {
+                    statusBar.textContent = `🔴 CRITICAL: ${totalCurrent.toFixed(1)}A`;
+                    statusBar.style.color = '#ef4444';
+                } else if (totalCurrent > 80) {
+                    statusBar.textContent = `🟡 WARNING: ${totalCurrent.toFixed(1)}A`;
+                    statusBar.style.color = '#f59e0b';
+                } else {
+                    statusBar.textContent = `🟢 NORMAL: ${totalCurrent.toFixed(1)}A`;
+                    statusBar.style.color = '#10b981';
+                }
+            } catch (e) {
+                // Ignore errors
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
+"""
+
+@router.get("/control-panel", response_class=HTMLResponse)
+def control_panel():
+    """
+    Load testing control panel.
+    Provides an interactive UI to trigger high load conditions.
+    """
+    return HTML_CONTENT
