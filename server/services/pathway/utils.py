@@ -186,6 +186,7 @@ def get_recommendation(power: float, carbon_level: str, pricing_tier: str) -> st
 def generate_llm_recommendation(
     device_id: str,
     device_type: str,
+    status: str,
     power: float,
     current: float,
     carbon_intensity: float,
@@ -196,71 +197,79 @@ def generate_llm_recommendation(
     cost_per_hour: float
 ) -> str:
     """
-    Generate specific, actionable recommendation using rule-based logic
-    
-    Note: For demo purposes, using deterministic rules instead of LLM API calls
-    to avoid latency and API costs during high-frequency stream processing.
-    
-    Args:
-        device_id: Device identifier
-        device_type: Type of device
-        power: Power consumption in watts
-        current: Current draw in amperes
-        carbon_intensity: Carbon intensity in gCO2/kWh
-        carbon_level: Carbon level category
-        electricity_price: Price per kWh
-        pricing_tier: Pricing tier category
-        renewable_pct: Renewable percentage
-        cost_per_hour: Current cost per hour
-        
-    Returns:
-        Specific recommendation string
+    Generate specific, actionable recommendation using rule-based logic.
+
+    Prioritizes safety-critical conditions (fault, overcurrent) before
+    cost/carbon optimization.
     """
-    
+
+    # Safety-critical: fault condition
+    if status == 'fault':
+        return (
+            f"FAULT on {device_id} ({device_type}) drawing {current:.0f}A / {power:.0f}W. "
+            f"Shut down immediately to prevent damage. Wasting ${cost_per_hour:.2f}/hr."
+        )
+
+    # Safety-critical: overcurrent during inrush
+    if status == 'starting' and current > PathwayConfig.HIGH_CURRENT_THRESHOLD:
+        return (
+            f"{device_id} inrush at {current:.0f}A ({power:.0f}W). "
+            f"Monitor closely -- will settle to steady-state in ~3s."
+        )
+
+    # Safety-critical: sustained overcurrent in running state
+    if current > PathwayConfig.HIGH_CURRENT_THRESHOLD:
+        return (
+            f"{device_id} drawing {current:.0f}A (>{PathwayConfig.HIGH_CURRENT_THRESHOLD:.0f}A threshold). "
+            f"Reduce load or shut down. Costing ${cost_per_hour:.2f}/hr."
+        )
+
+    # Cost optimization: high pricing
     if pricing_tier == 'HIGH' and power > 500:
-        savings_per_hour = cost_per_hour
         return (
-            f"Grid Price is ${electricity_price:.3f}/kWh (High). "
-            f"Stopping {device_id} will save approx ${savings_per_hour:.2f}/hour."
+            f"Grid price ${electricity_price:.3f}/kWh (High). "
+            f"Stopping {device_id} saves ~${cost_per_hour:.2f}/hr."
         )
-    
-    elif pricing_tier == 'HIGH' and carbon_level == 'HIGH':
-        savings_per_hour = cost_per_hour
+
+    if pricing_tier == 'HIGH' and carbon_level == 'HIGH':
         carbon_per_hour = (power / 1000) * carbon_intensity
         return (
-            f"Peak pricing (${electricity_price:.3f}/kWh) + High carbon ({carbon_intensity:.0f}gCO2/kWh). "
-            f"Reducing {device_id} saves ${savings_per_hour:.2f}/hr and {carbon_per_hour:.0f}g CO2/hr."
+            f"Peak pricing (${electricity_price:.3f}/kWh) + high carbon ({carbon_intensity:.0f}gCO2/kWh). "
+            f"Reducing {device_id} saves ${cost_per_hour:.2f}/hr and {carbon_per_hour:.0f}g CO2/hr."
         )
-    
-    elif carbon_level == 'HIGH' and power > 500:
+
+    # Carbon optimization
+    if carbon_level == 'HIGH' and power > 500:
         carbon_per_hour = (power / 1000) * carbon_intensity
         return (
-            f"Carbon intensity is {carbon_intensity:.0f}gCO2/kWh (High). "
+            f"Carbon intensity {carbon_intensity:.0f}gCO2/kWh (High). "
             f"Deferring {device_id} avoids {carbon_per_hour:.0f}g CO2/hr."
         )
-    
-    elif pricing_tier == 'LOW' and carbon_level == 'LOW':
+
+    # Optimal conditions
+    if pricing_tier == 'LOW' and carbon_level == 'LOW':
         return (
             f"Optimal conditions: ${electricity_price:.3f}/kWh, {renewable_pct:.0f}% renewable. "
             f"Good time to run {device_id}."
         )
-    
-    elif renewable_pct > 70:
+
+    if renewable_pct > 70:
         return (
-            f"Grid is {renewable_pct:.0f}% renewable (Clean energy!). "
+            f"Grid is {renewable_pct:.0f}% renewable. "
             f"{device_id} running on mostly clean power."
         )
-    
-    else:
-        return (
-            f"{device_id} operating normally. "
-            f"Current cost: ${cost_per_hour:.2f}/hr at ${electricity_price:.3f}/kWh."
-        )
+
+    # Normal operation
+    return (
+        f"{device_id} operating normally at {current:.1f}A. "
+        f"Cost: ${cost_per_hour:.2f}/hr at ${electricity_price:.3f}/kWh."
+    )
 
 
 def create_llm_prompt(
     device_id: str,
     device_type: str,
+    status: str,
     power: float,
     current: float,
     carbon_intensity: float,
@@ -271,8 +280,8 @@ def create_llm_prompt(
     cost_per_hour: float
 ) -> str:
     """
-    Create a detailed prompt for LLM-based recommendations
-    
+    Create a detailed prompt for LLM-based recommendations.
+
     Returns:
         Formatted prompt string
     """
@@ -280,6 +289,7 @@ def create_llm_prompt(
 
 Context:
 - Device: {device_id} ({device_type})
+- Status: {status}
 - Power Consumption: {power:.0f}W ({current:.1f}A)
 - Current Cost: ${cost_per_hour:.2f}/hour
 - Electricity Price: ${electricity_price:.3f}/kWh ({pricing_tier} pricing)
@@ -287,9 +297,9 @@ Context:
 - Renewable Energy: {renewable_pct:.0f}%
 
 Generate ONE concise recommendation (max 100 characters) that:
-1. States the specific grid condition (price or carbon)
+1. States the specific grid condition (price or carbon) or device fault
 2. Gives a specific action with the device ID
-3. Includes quantified savings ($ or CO2)
+3. Includes quantified savings ($ or CO2) or safety action
 
 Example: "Grid Price is $0.27 (High). Stopping HVAC_001 will save approx $5/hour."
 

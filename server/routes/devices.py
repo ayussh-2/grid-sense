@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from services.devices import device_manager
+from services.llm_insight import llm_insight_service
 
 router = APIRouter()
 
@@ -130,4 +131,6 @@ def inject_motor_fault(device_id: str):
     if device.device_type != "motor":
         raise HTTPException(status_code=400, detail="Device is not a motor")
     
-    return device.inject_fault()
+    result = device.inject_fault()
+    llm_insight_service.trigger_urgent()
+    return result

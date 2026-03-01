@@ -112,7 +112,7 @@ class PathwayProcessor:
             Stream of detected anomalies
         """
         anomalies = device_stream.filter(
-            pw.this.current > self.config.HIGH_CURRENT_THRESHOLD
+            (pw.this.current > self.config.HIGH_CURRENT_THRESHOLD) | (pw.this.status == "fault")
         ).select(
             device_id=pw.this.device_id,
             device_type=pw.this.device_type,
@@ -169,37 +169,42 @@ class PathwayProcessor:
             direction=pw.temporal.Direction.BACKWARD
         )
         
+        _carbon_intensity = pw.coalesce(pw.right.carbon_intensity, 500.0)
+        _carbon_level = pw.coalesce(pw.right.carbon_level, 'MEDIUM')
+        _pricing_tier = pw.coalesce(pw.right.pricing_tier, 'MEDIUM')
+        _renewable_pct = pw.coalesce(pw.right.renewable_pct, 35.0)
+        _electricity_price = pw.coalesce(pw.right.electricity_price, 0.15)
+        _cost_per_hour = pw.apply(
+            lambda p, price: round(p / 1000 * price, 4),
+            device_stream.power,
+            _electricity_price
+        )
+
         combined = joined.select(
             device_id=device_stream.device_id,
             device_type=device_stream.device_type,
+            status=device_stream.status,
             current=device_stream.current,
             power=device_stream.power,
-            carbon_intensity=pw.coalesce(pw.right.carbon_intensity, 500.0),
-            carbon_level=pw.coalesce(pw.right.carbon_level, 'MEDIUM'),
-            pricing_tier=pw.coalesce(pw.right.pricing_tier, 'MEDIUM'),
-            renewable_pct=pw.coalesce(pw.right.renewable_pct, 35.0),
-            electricity_price=pw.coalesce(pw.right.electricity_price, 0.15),
-            cost_per_hour=pw.apply(
-                lambda p, price: round(p / 1000 * price, 4),
-                device_stream.power,
-                pw.coalesce(pw.right.electricity_price, 0.15)
-            ),
+            carbon_intensity=_carbon_intensity,
+            carbon_level=_carbon_level,
+            pricing_tier=_pricing_tier,
+            renewable_pct=_renewable_pct,
+            electricity_price=_electricity_price,
+            cost_per_hour=_cost_per_hour,
             recommendation=pw.apply(
                 generate_llm_recommendation,
                 device_stream.device_id,
                 device_stream.device_type,
+                device_stream.status,
                 device_stream.power,
                 device_stream.current,
-                pw.coalesce(pw.right.carbon_intensity, 500.0),
-                pw.coalesce(pw.right.carbon_level, 'MEDIUM'),
-                pw.coalesce(pw.right.electricity_price, 0.15),
-                pw.coalesce(pw.right.pricing_tier, 'MEDIUM'),
-                pw.coalesce(pw.right.renewable_pct, 35.0),
-                pw.apply(
-                    lambda p, price: round(p / 1000 * price, 4),
-                    device_stream.power,
-                    pw.coalesce(pw.right.electricity_price, 0.15)
-                )
+                _carbon_intensity,
+                _carbon_level,
+                _electricity_price,
+                _pricing_tier,
+                _renewable_pct,
+                _cost_per_hour
             ),
             timestamp=device_stream.timestamp
         )

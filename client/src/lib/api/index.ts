@@ -13,4 +13,12 @@ export type {
     PathwayRecommendationsResponse,
     PathwayStatisticsResponse,
     PathwaySummary,
+    DemoScenario,
+    DemoScenarioResponse,
+    LLMInsight,
+    WsMessage,
+    WsLiveDataMessage,
+    WsGridContextMessage,
+    WsPathwayDataMessage,
+    WsLLMInsightMessage,
 } from "./types";

@@ -1,181 +1,243 @@
-### GridSense AI – Real-Time Energy Intelligence
+### GridSense AI -- Real-Time Energy Intelligence
 
-GridSense AI is a real-time energy monitoring and intelligence system that detects financial waste, operational inefficiency, and carbon-heavy usage as it happens. It continuously processes live device telemetry and grid context to surface plain-language, actionable recommendations that reduce costs and emissions.
+GridSense AI is a real-time industrial energy monitoring and optimization platform. It fuses high-frequency device telemetry with external grid signals (pricing, carbon intensity, renewables) using Pathway for stream processing and Google Gemini for natural language insights -- giving operators instant visibility, fault detection, and context-aware recommendations in a single dashboard.
 
 ### Problem & Solution
 
-- **The problem**: Traditional energy systems report usage too late, causing:
-    - **Peak demand penalties** from short-lived demand spikes.
-    - **Operational waste** from aging or faulty equipment (phantom loads).
-    - **Carbon blindness** because users cannot see when the grid is clean vs. dirty.
-- **The solution**: GridSense AI uses a streaming architecture to:
-    - Detect anomalies (spikes, faults, voltage issues) in milliseconds.
-    - Join internal device data with external grid price/carbon data.
-    - Use LLMs to generate simple, actionable recommendations (e.g., “Pause the compressor for 20 minutes to avoid peak charges.”).
+- **The problem**: Industrial facilities lack real-time visibility into device behavior combined with grid conditions, causing:
+    - **Peak demand penalties** from undetected demand spikes.
+    - **Operational waste** from faulty equipment running unnoticed.
+    - **Carbon blindness** -- no awareness of when the grid is clean vs. dirty.
+- **The solution**: GridSense AI uses a two-layer intelligence stack:
+    - **Pathway** processes dual data streams in real-time: device telemetry (10Hz) and grid context (pricing, carbon, renewables).
+    - **Gemini** synthesizes Pathway's processed outputs into plain-language, quantified recommendations via context-augmented generation.
 
 ---
 
 ### System Architecture
 
-The system is built as a streaming, REST-based architecture with four main layers:
+The system is built as a streaming, WebSocket-driven architecture with five layers:
 
-- **Digital Twin (Data Layer)**: Python-based simulator that generates realistic Voltage/Current/Power telemetry for industrial devices.
-- **Intelligence Engine (Logic Layer)**: Pathway streaming processor that ingests internal and external streams, detects anomalies, and computes statistics.
-- **Control Plane (Application Layer)**: FastAPI backend exposing REST endpoints for telemetry, control, and Pathway analytics.
-- **Operational Dashboard (Presentation Layer)**: Next.js frontend for real-time visualization, manual controls, and AI insights.
-
-**Architecture diagram (Mermaid):**
+- **Digital Twin (Data Layer)**: Physics-based simulator generating realistic V/I/P telemetry for motor, HVAC, compressor, and lighting devices.
+- **Pathway Engine (Stream Processing Layer)**: Real-time anomaly detection, device statistics, and temporal stream joining (device + grid via `asof_join`).
+- **LLM Layer (Intelligence Layer)**: Gemini 2.0 Flash with structured JSON output. Receives Pathway-processed context and produces severity-tagged, quantified insights.
+- **Control Plane (Application Layer)**: FastAPI backend with WebSocket push, REST device control, and demo scenario orchestration.
+- **Dashboard (Presentation Layer)**: Next.js frontend with real-time metrics, charts, and a unified Pathway Analytics panel.
 
 ```mermaid
 flowchart LR
-  subgraph Frontend["Next.js Dashboard (TypeScript)"]
-    UI["DashboardPage + components"]
-    APIClient["apiClient (REST)"]
-    UI --> APIClient
+  subgraph Frontend["Next.js Dashboard"]
+    UI["Dashboard + Components"]
+    WS_Client["useWebSocket Hook"]
+    UI <--> WS_Client
   end
 
-  subgraph Backend["FastAPI Backend (Python)"]
-    Router["APIRouter /api/*"]
-    Live["Live + Devices\n(/api/live, /api/devices, /api/stream/*)"]
-    Grid["Grid Context\n(/api/grid)"]
-    PathwayAPI["Pathway Analytics\n(/api/pathway/*)"]
-    Sim["Digital Twin Simulator"]
+  subgraph Backend["FastAPI Backend"]
+    WS_Server["WebSocket /ws"]
+    REST["REST API /api/*"]
+    Demo["Demo Scenarios /api/demo/*"]
+    LLM_Service["LLM Insight Service"]
+    Sim["Device Simulator"]
+    Grid["Grid Context Service"]
 
-    Router --> Live
-    Router --> Grid
-    Router --> PathwayAPI
-
-    Live <--> Sim
-    Grid <--> Sim
+    REST <--> Sim
+    REST <--> Grid
+    WS_Server --> LLM_Service
   end
 
-  subgraph Pathway["Pathway Stream Processor"]
-    IntStream["Internal Stream\n(get_internal_url -> /api/stream/internal)"]
-    ExtStream["External Stream\n(get_external_url -> /api/stream/external)"]
-    Engine["Anomaly & Stats Engine"]
-    LLM["Gemini Model"]
-    Files["JSONL Outputs\n(pathway_output/*.jsonl)"]
+  subgraph Pathway["Pathway Engine"]
+    IntStream["Internal Stream 10Hz"]
+    ExtStream["External Stream 15s"]
+    Anomaly["Anomaly Detection"]
+    Stats["Device Statistics"]
+    JSONL["JSONL Outputs"]
 
-    IntStream --> Engine
-    ExtStream --> Engine
-    Engine --> LLM
-    LLM --> Files
+    IntStream --> Anomaly
+    IntStream --> Stats
+    ExtStream --> Anomaly
+    Anomaly --> JSONL
+    Stats --> JSONL
   end
 
-  User["User Browser"] --> UI
-  APIClient <--> Router
+  subgraph LLM["Google Gemini"]
+    Context["Context Builder"]
+    Gemini["Gemini 2.0 Flash"]
+    Insight["Structured GridInsight"]
 
-  Pathway --> Live
-  Pathway --> Grid
-  Files --> PathwayAPI
+    Context --> Gemini
+    Gemini --> Insight
+  end
+
+  User["Browser"] --> WS_Client
+  WS_Client <-->|"Single WebSocket"| WS_Server
+  User -->|"Device Control"| REST
+  User -->|"Demo Triggers"| Demo
+
+  Pathway -->|"Polls"| REST
+  JSONL --> WS_Server
+  JSONL --> Context
+  Sim --> Context
+  Grid --> Context
+  Insight --> LLM_Service
 ```
 
 ---
 
 ### System Workflow
 
-At a high level, the system runs three continuous loops plus interactive controls:
+The system runs four continuous data flows plus interactive controls:
 
-- **1. Telemetry & grid polling**
-    - Dashboard polls `GET /api/live` every 1s for device telemetry.
-    - Dashboard polls `GET /api/grid` every ~15 minutes for price and carbon intensity.
-    - UI updates metrics, charts, and device tables in real time.
+- **1. WebSocket push (real-time)**
+    - A single persistent WebSocket connection pushes four data streams to the dashboard:
+        - **Live telemetry** every 1 second (device current, power, voltage, status).
+        - **Grid context** every 60 seconds (carbon intensity, electricity price, renewable %).
+        - **Pathway analytics** every 2 seconds (anomalies, device statistics).
+        - **LLM insights** on change (pushed when Gemini generates a new insight).
+    - Auto-reconnects with exponential backoff (1s to 16s). Green/red indicator in header.
 
-- **2. Stream processing & AI recommendations**
-    - Pathway polls:
-        - `GET /api/stream/internal` at high frequency (e.g., 10 Hz) for device data.
-        - `GET /api/stream/external` at lower frequency for grid context.
-    - Pathway:
-        - Joins device and grid streams.
-        - Detects anomalies (inrush vs. locked rotor, overcurrent, voltage issues).
-        - Computes device statistics and total power.
-        - Calls Gemini to generate human-readable optimization recommendations.
-    - Results are continuously appended as JSONL files under `pathway_output/`.
+- **2. Pathway stream processing**
+    - Pathway polls the FastAPI server:
+        - `GET /api/stream/internal` at 10Hz for device data.
+        - `GET /api/stream/external` every 15s for grid context.
+    - Performs real-time:
+        - **Anomaly detection** -- filters current > 100A, classifies as inrush/fault/overcurrent.
+        - **Device statistics** -- GroupBy aggregation per device type (avg/max current, avg power, sample count).
+    - Results appended as JSONL under `pathway_output/`.
 
-- **3. Pathway analytics polling (UI)**
-    - Dashboard polls `GET /api/pathway/status`, `/anomalies`, `/recommendations`, `/statistics` every few seconds.
-    - FastAPI reads the JSONL outputs and returns structured anomalies, stats, and recommendations.
-    - UI updates the Pathway panel and overall system status.
+- **3. LLM insight generation (Gemini)**
+    - Background service builds a context snapshot from: device telemetry, grid conditions, Pathway anomalies, and device statistics.
+    - Calls Gemini 2.0 Flash with structured JSON schema (Pydantic `GridInsight` model).
+    - **State fingerprinting**: only calls Gemini when the system state actually changes (device status, current bracket, pricing tier, or carbon level).
+    - **Critical auto-trigger**: monitors for faults/overcurrent every 2s and triggers immediate re-analysis.
+    - **Rate limit handling**: parses 429 retry delays and backs off automatically.
+    - Returns: summary, severity, observations, actions, cost insight, carbon insight.
 
-- **4. Device control workflow**
-    - User triggers actions (on/off/start/fault) from the UI.
-    - Dashboard calls FastAPI control endpoints.
-    - Simulator updates its internal state, which is reflected in subsequent telemetry.
-    - Pathway sees the new patterns and updates analytics accordingly.
-
-**Workflow diagram (Mermaid sequence):**
+- **4. Device control & demo scenarios**
+    - User triggers on/off/start/fault from the device table.
+    - Demo panel provides one-click scenarios: Surge All, Motor Inrush, High Load, Normal Ops, Inject Fault, Reset.
+    - Each scenario orchestrates multiple device state changes to showcase specific system capabilities.
 
 ```mermaid
 sequenceDiagram
-  participant User as User (Browser)
-  participant UI as Next.js Dashboard
-  participant API as apiClient
-  participant BE as FastAPI Backend
-  participant Sim as Digital Twin
-  participant PW as Pathway
+  participant User as Browser
+  participant WS as WebSocket
+  participant API as FastAPI
+  participant Sim as Device Simulator
+  participant PW as Pathway Engine
   participant LLM as Gemini
 
-  User->>UI: Open dashboard
-  UI->>API: Poll getLiveData() (1s)
-  API->>BE: GET /api/live
-  BE->>Sim: Fetch latest telemetry
-  Sim-->>BE: Device data
-  BE-->>API: JSON telemetry
-  API-->>UI: DeviceTelemetry[]
-  UI->>UI: Update metrics & charts
+  User->>WS: Connect /ws
+  WS-->>User: Connection established
 
-  UI->>API: Poll getGridContext() (15 min)
-  API->>BE: GET /api/grid
-  BE->>Sim: Get grid context
-  Sim-->>BE: Price & carbon
-  BE-->>API: GridContext
-  API-->>UI: GridContext
-  UI->>UI: Update cost/carbon KPIs
+  loop Every 1s
+    API->>Sim: Get telemetry
+    Sim-->>API: Device data
+    WS-->>User: live_data message
+  end
 
-  PW->>BE: GET /api/stream/internal
-  PW->>BE: GET /api/stream/external
-  BE->>Sim: Provide event streams
-  Sim-->>BE: Events
-  BE-->>PW: JSON events
+  loop Every 60s
+    WS-->>User: grid_context message
+  end
 
-  PW->>PW: Detect anomalies & stats
-  PW->>LLM: Send context for advice
-  LLM-->>PW: Recommendations
-  PW->>PW: Write JSONL outputs
+  loop 10Hz
+    PW->>API: GET /api/stream/internal
+    PW->>API: GET /api/stream/external
+    PW->>PW: Anomaly detection + statistics
+    PW->>PW: Write JSONL
+  end
 
-  UI->>API: Poll Pathway endpoints (5s)
-  API->>BE: GET /api/pathway/*
-  BE->>BE: Read JSONL outputs
-  BE-->>API: Anomalies, stats, recs, status
-  API-->>UI: Pathway data
-  UI->>UI: Update Pathway panel & status
+  loop Every 2s
+    API->>API: Read JSONL outputs
+    WS-->>User: pathway_data message
+  end
 
-  User->>UI: Toggle device on/off/start/fault
-  UI->>API: Control request
-  API->>BE: POST /api/devices/.../control/*
-  BE->>Sim: Apply new state
-  Sim-->>BE: Updated telemetry
-  BE-->>API: ACK
-  API-->>UI: Success
-  UI->>API: Force refresh live data
+  loop On state change
+    API->>LLM: Context snapshot
+    LLM-->>API: GridInsight (JSON)
+    WS-->>User: llm_insight message
+  end
+
+  User->>API: POST /api/demo/scenarios/fault
+  API->>Sim: Inject fault
+  Note over PW,LLM: Pathway detects anomaly, LLM re-analyzes
 ```
+
+---
+
+### Dashboard Layout
+
+Top to bottom:
+
+1. **Header** -- System status badge (Normal/Warning/Critical) + WebSocket indicator (green dot) + clock.
+2. **Demo Panel** -- Collapsible grid of 6 one-click scenario buttons with descriptions and capability tags.
+3. **Metrics Grid** -- 6 KPI cards: Total Current, Total Power, Avg Voltage, Carbon Intensity, Renewable %, Electricity Price.
+4. **Live Chart** -- Real-time area chart of total current (30-point rolling window). Turns red during critical conditions.
+5. **Pathway Analytics Panel** -- Unified intelligence panel with:
+    - AI Insight (Gemini-generated summary, severity, observations, actions, cost/carbon insights).
+    - Recent Anomalies (fault/inrush/overcurrent alerts from Pathway).
+    - Device Performance (per-device-type statistics).
+6. **Device Table** -- Per-device status, current, power, voltage, with on/off controls.
+
+---
+
+### Demo Scenarios
+
+| Scenario | What it does | What it showcases |
+|---|---|---|
+| **Surge All** | All devices on + motor fault (110A sustained) | Anomaly detection, fault alerts, critical status, LLM recommendations |
+| **Motor Inrush** | Motor start: 120A peak, decays to 45A over 3.5s | Transient spike detection, real-time chart spike |
+| **High Load** | Motor + HVAC + Compressor (~90A) | Warning status, cost optimization insights |
+| **Normal Ops** | HVAC + Lighting only (~22A) | Normal status, optimal grid recommendations |
+| **Inject Fault** | Locked rotor fault on motor (110A sustained) | Fault detection, critical alerts, safety-first recommendations |
+| **Reset** | All devices off | Returns to idle baseline |
 
 ---
 
 ### Technology Stack
 
-- **Frontend**
-    - **Next.js / React (TypeScript)**: Real-time dashboard, charts, control panel, AI insights.
-    - **Tailwind CSS / modern UI components**: Responsive and dashboard-friendly layout.
+- **Frontend**: Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Recharts
+- **Backend**: FastAPI, Python 3.11, Uvicorn (ASGI)
+- **Stream Processing**: Pathway (real-time, incremental)
+- **LLM**: Google Gemini 2.0 Flash (structured JSON output via Pydantic schema)
+- **Communication**: WebSocket (single persistent connection, 4 data streams)
+- **Simulation**: Physics-based device models (motor inrush curves, HVAC thermodynamics)
 
-- **Backend**
-    - **FastAPI (Python)**: REST API for live telemetry, device control, grid context, and Pathway analytics.
-    - **Python digital twin simulator**: Physics-based motor and grid behavior (idle, startup, steady, fault, voltage swell).
+---
 
-- **Stream Processing & AI**
-    - **Pathway**: High-performance streaming engine for anomaly detection, statistics, and aggregations.
-    - **Gemini (gemini-3-flash-preview)**: LLM used to turn raw metrics into clear, actionable recommendations.
+### Setup
 
-- **Languages**
-    - **Python** for backend, simulation, and stream processing.
-    - **TypeScript** for frontend and API client.
+**Backend:**
+
+```bash
+cd server
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt
+```
+
+Create `server/.env`:
+
+```
+GEMINI_API_KEY=your_key_here
+```
+
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey).
+
+```bash
+# Terminal 1: API server
+fastapi dev main.py
+
+# Terminal 2: Pathway processor
+python run_pathway.py
+```
+
+**Frontend:**
+
+```bash
+cd client
+bun install
+bun dev
+```
+
+Dashboard at `http://localhost:3000`, API at `http://localhost:8000`.

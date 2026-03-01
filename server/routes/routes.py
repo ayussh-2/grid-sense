@@ -6,6 +6,8 @@ from routes.devices import router as devices_router
 from routes.live_data import router as live_data_router
 from routes.control_panel import router as control_panel_router
 from routes.pathway_routes import router as pathway_router
+from routes.websocket import router as websocket_router
+from routes.demo import router as demo_router
 
 router = APIRouter()
 
@@ -21,4 +23,6 @@ router.include_router(grid_router, prefix="/api/grid", tags=["Grid Context"])
 router.include_router(combined_router, prefix="/api/stream", tags=["Data Streams"])
 router.include_router(pathway_router, prefix="/api/pathway", tags=["Pathway Analytics"])
 router.include_router(control_panel_router, tags=["Testing"])
+router.include_router(websocket_router, tags=["WebSocket"])
+router.include_router(demo_router, prefix="/api/demo", tags=["Demo"])
 

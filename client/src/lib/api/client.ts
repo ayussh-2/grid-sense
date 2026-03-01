@@ -1,4 +1,4 @@
-import type { DeviceTelemetry, GridContext, DeviceListResponse, ControlResponse, PathwayStatus, PathwayAnomaliesResponse, PathwayRecommendationsResponse, PathwayStatisticsResponse, PathwaySummary } from "./types";
+import type { DeviceTelemetry, GridContext, DeviceListResponse, ControlResponse, PathwayStatus, PathwayAnomaliesResponse, PathwayRecommendationsResponse, PathwayStatisticsResponse, PathwaySummary, DemoScenarioResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -93,6 +93,13 @@ class ApiClient {
 
     async getPathwaySummary(): Promise<PathwaySummary> {
         return this.fetch<PathwaySummary>("/api/pathway/summary");
+    }
+
+    // Demo Endpoints
+    async runDemoScenario(scenarioId: string): Promise<DemoScenarioResponse> {
+        return this.fetch<DemoScenarioResponse>(`/api/demo/scenarios/${scenarioId}`, {
+            method: "POST",
+        });
     }
 }
 

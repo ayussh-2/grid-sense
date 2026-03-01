@@ -116,3 +116,67 @@ export interface PathwaySummary {
     };
     status: PathwayStatus;
 }
+
+// Demo scenario types
+
+export interface DemoScenario {
+    name: string;
+    description: string;
+    showcases: string[];
+}
+
+export interface DemoScenarioResponse {
+    status: string;
+    scenario: string;
+    name: string;
+    description: string;
+    showcases: string[];
+}
+
+// WebSocket message types
+
+export interface WsLiveDataMessage {
+    type: "live_data";
+    data: Record<string, DeviceTelemetry>;
+}
+
+export interface WsGridContextMessage {
+    type: "grid_context";
+    data: GridContext;
+}
+
+export interface WsPathwayDataMessage {
+    type: "pathway_data";
+    data: {
+        pathway_active: boolean;
+        anomalies?: PathwayAnomaly[];
+        recommendations?: PathwayRecommendation[];
+        statistics?: { [device_type: string]: PathwayDeviceStats };
+    };
+}
+
+export interface LLMInsight {
+    summary: string;
+    severity: "normal" | "warning" | "critical";
+    observations: string[];
+    actions: string[];
+    cost_insight: string;
+    carbon_insight: string;
+    timestamp: number;
+}
+
+export interface WsLLMInsightMessage {
+    type: "llm_insight";
+    data: LLMInsight;
+}
+
+export interface WsPongMessage {
+    type: "pong";
+}
+
+export type WsMessage =
+    | WsLiveDataMessage
+    | WsGridContextMessage
+    | WsPathwayDataMessage
+    | WsLLMInsightMessage
+    | WsPongMessage;

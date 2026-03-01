@@ -7,9 +7,13 @@ import { useEffect, useState } from "react";
 
 interface HeaderProps {
     systemStatus?: "normal" | "warning" | "critical";
+    connected?: boolean;
 }
 
-export function Header({ systemStatus = "normal" }: HeaderProps) {
+export function Header({
+    systemStatus = "normal",
+    connected = false,
+}: HeaderProps) {
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -39,6 +43,10 @@ export function Header({ systemStatus = "normal" }: HeaderProps) {
                 <Badge variant={statusVariant[systemStatus]}>
                     {statusText[systemStatus]}
                 </Badge>
+                <span
+                    className={`inline-block w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400 animate-pulse"}`}
+                    title={connected ? "WebSocket connected" : "Reconnecting..."}
+                />
             </div>
 
             <div className="flex items-center gap-2 text-slate-400">

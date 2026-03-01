@@ -17,7 +17,7 @@ class PathwayConfig:
     EXTERNAL_STREAM_PATH: Final[str] = "/api/stream/external"
     
     GEMINI_API_KEY: Final[str] = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: Final[str] = "gemini-3-flash-preview"
+    GEMINI_MODEL: Final[str] = "gemini-2.5-flash-lite"
     
     INTERNAL_POLL_INTERVAL: Final[float] = 0.1  # 10Hz = 100ms
     EXTERNAL_POLL_INTERVAL: Final[float] = 15.0  # 15 seconds (demo mode)
@@ -40,6 +40,10 @@ class PathwayConfig:
     RECOMMENDATIONS_FILE: Final[str] = f"{OUTPUT_DIR}/recommendations.jsonl"
     DEVICE_STATS_FILE: Final[str] = f"{OUTPUT_DIR}/device_stats.jsonl"
     TOTAL_POWER_FILE: Final[str] = f"{OUTPUT_DIR}/total_power.jsonl"
+    
+    # LLM Insight Configuration
+    LLM_INSIGHT_INTERVAL: Final[float] = 30.0  # seconds between Gemini calls
+    LLM_INSIGHTS_FILE: Final[str] = f"{OUTPUT_DIR}/llm_insights.jsonl"
     
     # HTTP Request Configuration
     REQUEST_TIMEOUT: Final[int] = 2  # seconds

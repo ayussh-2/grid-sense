@@ -6,3 +6,5 @@ export { LiveChart } from "./LiveChart";
 export { DeviceTable } from "./DeviceTable";
 export { AIPanel } from "./AIPanel";
 export { PathwayPanel } from "./PathwayPanel";
+export { DemoPanel } from "./DemoPanel";
+export { InsightPanel } from "./InsightPanel";
